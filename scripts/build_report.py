@@ -23,6 +23,17 @@ BENCH_RATIO = 95.0      # 적극추진: 긍정 비율(%) 기준
 IND_AVG     = 4.5       # 업계 평균 별점(벤치마크)
 N_CARDS     = 10        # ③ 심층분석 카드 상품 수
 
+# ── 기간 필터 ── 아래 중 하나만 설정하면 됨. 셋 다 비우면(=None/0) 전체 기간.
+#  · REPORT_DAYS  : 가장 최근 리뷰 기준 최근 N일 (예: 90). 정기 리포트에 가장 자연스러움.
+#  · REPORT_START / REPORT_END : 'YYYY-MM-DD' 명시 기간 (START가 있으면 DAYS보다 우선).
+# 워크플로/수동 실행 때 같은 이름의 환경변수로 덮어쓸 수 있다.
+REPORT_DAYS  = 90
+REPORT_START = None
+REPORT_END   = None
+REPORT_DAYS  = int(os.environ['REPORT_DAYS']) if os.environ.get('REPORT_DAYS') else REPORT_DAYS
+REPORT_START = os.environ.get('REPORT_START') or REPORT_START
+REPORT_END   = os.environ.get('REPORT_END') or REPORT_END
+
 GENERIC = {'만족','배송','가격','빠르다','감사','최고','괜찮다','만족스럽다'}   # 흔해서 강조 제외
 NEG_KW  = {'소음','소리','무겁다','아쉽다','아쉽','불편','시끄럽다'}            # 부정어: 카테고리 키워드 제외
 MERGE   = {'이쁘다':'예쁘다','시원':'시원하다','편리':'편하다','깔끔':'깔끔하다','튼튼':'튼튼하다','만족':'만족스럽다'}
@@ -121,11 +132,31 @@ def auto_note(chips, ratio):
 
 def build(csv_path, out_path):
     df, cust = load(csv_path)
+    cust['dt'] = pd.to_datetime(cust['리뷰작성일시'], format='%y-%m-%d %H:%M', errors='coerce')
+    data_min, data_max = cust['dt'].min(), cust['dt'].max()
+
+    # 기간 필터 (최근 N일 또는 명시 기간). 기준점은 '파일 내 최신 리뷰'로 잡아 스냅샷에도 안전.
+    if REPORT_START or REPORT_END or REPORT_DAYS:
+        end = pd.Timestamp(REPORT_END) if REPORT_END else data_max
+        if REPORT_START:
+            start = pd.Timestamp(REPORT_START)
+        elif REPORT_DAYS:
+            start = end - pd.Timedelta(days=REPORT_DAYS)
+        else:
+            start = data_min
+        filtered = cust[(cust['dt'] >= start) & (cust['dt'] < end + pd.Timedelta(days=1))]
+        if len(filtered) == 0:
+            print(f"[경고] 설정 기간({start:%Y.%m.%d}~{end:%Y.%m.%d})에 리뷰가 없어 전체 기간으로 대체합니다.")
+            period = f"{data_min:%Y.%m.%d} – {data_max:%Y.%m.%d}"
+        else:
+            cust = filtered
+            period = f"{start:%Y.%m.%d} – {end:%Y.%m.%d}"
+    else:
+        period = f"{data_min:%Y.%m.%d} – {data_max:%Y.%m.%d}"
+
     N_all = len(df); N_cust = len(cust); N_pos = int(cust['is_pos'].sum())
     pos_ratio = round(N_pos / N_cust * 100, 2); n_prod = cust['상품코드'].nunique()
     avg = round(cust['리뷰평점'].mean(), 2)
-    dt = pd.to_datetime(cust['리뷰작성일시'], format='%y-%m-%d %H:%M', errors='coerce')
-    period = f"{dt.min():%Y.%m.%d} – {dt.max():%Y.%m.%d}"
 
     overall_kw, per_kw = extract_keywords(cust)
     over = [(w, c) for w, c in merge_counter(overall_kw, drop={'만족스럽다','감사','최고','괜찮다'}).most_common(15)]
