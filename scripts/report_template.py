@@ -12,12 +12,18 @@ def render_rec(rec):
     sims = rec.get("similar", [])
     grps = rec.get("groups", [])
 
-    # (1) 카테고리 추천
+    # (1) 카테고리 추천 — 행 클릭 시 해당 카테고리 상품 목록 펼침
     cat_rows = ""
     for c in cats:
-        cat_rows += (f'<tr><td>{esc(c["cat"])}</td><td class="num">{c["n_products"]:,}</td>'
+        cat_rows += (f'<tr class="catrow" onclick="onCatRow(this)"><td>{esc(c["cat"])}</td>'
+                     f'<td class="num">{c["n_products"]:,}</td>'
                      f'<td class="num">{c["n_reviews"]:,}</td><td class="num pos">{f2(c["pos_ratio"])}%</td>'
                      f'<td class="num">★{f2(c["avg"])}</td></tr>')
+        prods = ""
+        for pr in c.get("products", []):
+            prods += (f'<div class="cp"><b>{esc(pr["name"])}</b>'
+                      f'<span class="cpm">긍정 {f2(pr["pos_ratio"])}% · ★{f2(pr["avg"])} · 후기 {pr["n"]:,}</span></div>')
+        cat_rows += f'<tr class="catdetail"><td colspan="5"><div class="catprods">{prods}</div></td></tr>'
 
     # (2) 유사 상품 추천
     sim_html = ""
@@ -43,7 +49,7 @@ def render_rec(rec):
 <h2>④ 판매 추천 <span class="tag">리뷰·키워드 기반 · 무엇을 더 밀지</span></h2>
 <p class="lead">후기 20건 이상 상품을 대상으로, 만족도와 키워드를 분석해 판매를 확대할 후보를 제안합니다. 참고용 데이터이며 최종 판단은 운영 맥락과 함께 보세요.</p>
 
-<h3 class="rec-h">카테고리 추천 <span class="rtag">만족도 높은 카테고리</span></h3>
+<h3 class="rec-h">카테고리 추천 <span class="rtag">만족도 높은 카테고리 · 행을 클릭하면 상품 목록</span></h3>
 <table><thead><tr><th>카테고리</th><th class="num">상품수</th><th class="num">후기</th><th class="num">긍정비율</th><th class="num">평균별점</th></tr></thead>
 <tbody>{cat_rows}</tbody></table>
 
@@ -94,14 +100,15 @@ def HTML_TEMPLATE(d):
             qhtml += f'<blockquote class="{cls}">“{esc(q)}”</blockquote>'
         dls = p.get('downloads', [])
         more_avail = p.get('n_total', 0) > len(qlist)   # 표시분보다 실제 후기가 더 많으면 다운로드 제공
-        # 토글/다운로드 버튼 (보여줄 게 2개 초과이거나, 더 받을 게 있을 때만)
         btn = ""
-        if len(qlist) > 2 or more_avail:
+        if len(qlist) > 2:
+            btn += (f'<button class="morebtn" data-idx="{idx}" onclick="onToggle(this)">'
+                    f'더보기 (+{len(qlist)-2})</button>')
+        if more_avail and dls:
             dl_json = esc(_json.dumps(dls, ensure_ascii=False))
-            btn = (f'<button class="morebtn" data-idx="{idx}" data-total="{len(qlist)}" '
-                   f'data-more="{1 if more_avail else 0}" data-name="{esc(p["name"])}" '
-                   f'onclick="onMore(this)">더보기</button>'
-                   f'<script type="application/json" id="dl-{idx}">{dl_json}</script>')
+            btn += (f'<button class="dlbtn" data-idx="{idx}" data-name="{esc(p["name"])}" '
+                    f'onclick="downloadReviews(this)">리뷰 내려받기</button>'
+                    f'<script type="application/json" id="dl-{idx}">{dl_json}</script>')
         ratio_cls = "warn" if p['pos_ratio'] < 85 else "pos"
         cards += f'''<article class="{'card is-push' if p['push'] else 'card'}">
           <header class="card-h">
@@ -136,7 +143,7 @@ def HTML_TEMPLATE(d):
 body{{margin:0;background:var(--paper);color:var(--ink);font-family:Pretendard,system-ui,sans-serif;
 line-height:1.6;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum";
 word-break:keep-all;overflow-wrap:break-word;}}
-.wrap{{max-width:920px;margin:0 auto;padding:56px 24px 96px}}
+.wrap{{max-width:1140px;margin:0 auto;padding:56px 32px 96px}}
 .eyebrow{{font-size:13px;letter-spacing:.14em;color:var(--amber);font-weight:700;text-transform:uppercase}}
 h1{{font-size:34px;font-weight:800;letter-spacing:-.02em;margin:.3em 0 .1em;line-height:1.2}}
 .sub{{color:var(--muted);font-size:15px;margin-bottom:8px}}
@@ -162,6 +169,7 @@ padding:2px 8px;border-radius:20px;vertical-align:middle;white-space:nowrap;lett
 .bar{{height:9px;background:var(--chip);border-radius:6px;overflow:hidden}}
 .bar-fill{{height:100%;border-radius:6px}}
 .kwrow{{display:grid;grid-template-columns:96px 1fr 56px;align-items:center;gap:14px;padding:5px 0}}
+.kwgrid{{display:grid;grid-template-columns:1fr 1fr;gap:0 44px}}
 .kwname{{font-weight:600;font-size:14px}}
 .kwcnt{{text-align:right;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}}
 .rrow{{display:grid;grid-template-columns:26px 1.5fr 1fr 64px 110px;align-items:center;gap:14px;
@@ -202,6 +210,19 @@ border-left:3px solid var(--amber);font-size:12.5px;color:#4A4842;line-height:1.
 .morebtn{{margin-top:10px;font-size:12px;font-weight:700;color:#6E6B63;background:#fff;
 border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}}
 .morebtn:hover{{border-color:var(--amber);color:#9a5a08}}
+.dlbtn{{margin:10px 0 0 8px;font-size:12px;font-weight:700;color:#9a5a08;background:var(--amber-soft);
+border:1px solid #F1D9B8;border-radius:8px;padding:6px 12px;cursor:pointer}}
+.dlbtn:hover{{background:#F6E4C8}}
+tr.catrow{{cursor:pointer}}
+tr.catrow:hover td{{background:var(--amber-soft)}}
+tr.catrow td:first-child::before{{content:'▸';color:var(--amber);font-size:11px;margin-right:7px;display:inline-block}}
+tr.catrow.open td:first-child::before{{content:'▾'}}
+tr.catdetail{{display:none}}
+tr.catdetail>td{{background:#FbF9F4;padding:0 14px 12px}}
+.catprods{{display:grid;grid-template-columns:1fr 1fr;gap:4px 28px;padding:10px 4px 4px}}
+.catprods .cp{{display:flex;justify-content:space-between;font-size:12px;color:#4A4842;padding:3px 0;border-bottom:1px solid #EFEAE0}}
+.catprods .cp b{{font-weight:600}}
+.catprods .cpm{{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:10px}}
 .rec-h{{font-size:15px;font-weight:800;margin:26px 0 10px;display:flex;align-items:baseline;gap:8px}}
 .rec-h .rtag{{font-size:12px;font-weight:600;color:var(--muted)}}
 .simwrap{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}
@@ -223,7 +244,7 @@ padding:3px 10px;font-size:13px;font-weight:700;flex:none}}
 .dot{{width:11px;height:11px;border-radius:3px;display:inline-block}}
 footer{{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);line-height:1.7}}
 footer b{{color:var(--ink)}}
-@media(max-width:680px){{.band{{grid-template-columns:repeat(2,1fr)}}.cards{{grid-template-columns:1fr}}.simwrap{{grid-template-columns:1fr}}
+@media(max-width:680px){{.band{{grid-template-columns:repeat(2,1fr)}}.cards{{grid-template-columns:1fr}}.simwrap{{grid-template-columns:1fr}}.kwgrid{{grid-template-columns:1fr}}
 .rrow{{grid-template-columns:22px 1fr 64px}}.rrow .rbar,.rrow .rmeta{{display:none}}h1{{font-size:27px}}}}
 </style></head>
 <body><div class="wrap">
@@ -242,16 +263,16 @@ footer b{{color:var(--ink)}}
 
 <div class="bench">
   <h4>📊 타 쇼핑몰 대비 객관적 위치</h4>
-  <p>업계 벤치마크상 이커머스 상품의 <b>평균 별점은 {bm['ind_avg']}★</b>(≈90% 환산)입니다. 평점이 4.0~4.7★ 구간일 때 실제 구매로 이어지는 비율(전환율)이 가장 높게 나오는 경향이 있고, 90% 이상이면 최상위로 강한 고객 호응을 뜻합니다. (별점이 무조건 높다고 좋은 건 아니며, 5.0★처럼 너무 완벽하면 오히려 신뢰도가 떨어지기도 합니다.)</p>
-  <p>원룸만들기 매장 전체는 <b>평균 {f2(s['avg'])}★ · 긍정 {f2(s['pos_ratio'])}%</b>로 업계 평균({bm['ind_avg']}★) 수준입니다. 그 위로 명확히 올라서는 상품을 '적극 추진 후보'로 표시했습니다.</p>
-  <div class="crit">적극 추진 기준 (시장 평균 상회): <b>평균 ★{bm['avg']} 이상 + 긍정 비율 {int(bm['ratio'])}% 이상 + 후기 {bm['min_n']}건 이상</b> &nbsp;→ 전체 {s['n_prod']:,}개 상품 중 <b>{bm['n_push']}개</b>가 해당. 아래 <span class="push">▲ 적극 추진</span> 표시.</div>
+  <p>업계 벤치마크상 이커머스 상품의 <b>평균 별점은 {bm['ind_avg']}★</b>(≈90% 환산)입니다.<br>평점이 4.0~4.7★ 구간일 때 실제 구매로 이어지는 비율(전환율)이 가장 높게 나오는 경향이 있고, 90% 이상이면 최상위로 강한 고객 호응을 뜻합니다.<br>(별점이 무조건 높다고 좋은 건 아니며, 5.0★처럼 너무 완벽하면 오히려 신뢰도가 떨어지기도 합니다.)</p>
+  <p>원룸만들기 매장 전체는 <b>평균 {f2(s['avg'])}★ · 긍정 {f2(s['pos_ratio'])}%</b>로 업계 평균({bm['ind_avg']}★) 수준입니다.<br>그 위로 명확히 올라서는 상품을 '적극 추진 후보'로 표시했습니다.</p>
+  <div class="crit">적극 추진 기준 (시장 평균 상회): <b>평균 ★{bm['avg']} 이상 + 긍정 비율 {int(bm['ratio'])}% 이상 + 후기 {bm['min_n']}건 이상</b><br>→ 전체 {s['n_prod']:,}개 상품 중 <b>{bm['n_push']}개</b>가 해당. 아래 <span class="push">▲ 적극 추진</span> 표시.</div>
   <p class="src">출처: PowerReviews(25.4M+ 상품 페이지 분석), Amazon 평점 기준 등 공개 이커머스 벤치마크</p>
 </div>
 
 <section>
 <h2>전체 긍정 키워드 <span class="tag">긍정 후기에서 가장 자주 언급된 만족 요인</span></h2>
 <p class="lead">고객이 어떤 점에 만족하는지를 한눈에. 막대는 해당 키워드가 등장한 긍정 후기 수입니다.</p>
-{over_html}
+<div class="kwgrid">{over_html}</div>
 </section>
 
 <section>
@@ -293,19 +314,26 @@ footer b{{color:var(--ink)}}
 </footer>
 
 <script>
-function onMore(btn){{
+function onToggle(btn){{
   var card = btn.closest('article');
   var extras = card.querySelectorAll('.quotes .qt.extra');
   var expanded = btn.getAttribute('data-expanded') === '1';
   if(!expanded){{
     extras.forEach(function(e){{ e.style.display='block'; }});
     btn.setAttribute('data-expanded','1');
-    if(btn.getAttribute('data-more') === '1'){{ btn.textContent='더 많이 보기 (리뷰 내려받기)'; }}
-    else {{ btn.style.display='none'; }}
+    btn.textContent = '접기';
   }} else {{
-    // 두 번째 클릭 = 다운로드
-    downloadReviews(btn);
+    extras.forEach(function(e){{ e.style.display='none'; }});
+    btn.setAttribute('data-expanded','0');
+    btn.textContent = '더보기 (+' + extras.length + ')';
   }}
+}}
+function onCatRow(row){{
+  var detail = row.nextElementSibling;
+  if(!detail || !detail.classList.contains('catdetail')) return;
+  var open = detail.style.display === 'table-row';
+  detail.style.display = open ? 'none' : 'table-row';
+  row.classList.toggle('open', !open);
 }}
 function downloadReviews(btn){{
   var idx = btn.getAttribute('data-idx');
