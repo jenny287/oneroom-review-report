@@ -285,8 +285,13 @@ def build(csv_path, out_path):
     catg['avg_rating'] = pool.groupby('cat')['avg'].mean().round(2).values
     catg['pos_ratio'] = (catg['pos'] / catg['n_reviews'] * 100).round(2)
     catg = catg[catg['cat'] != '기타'].sort_values(['pos_ratio', 'n_reviews'], ascending=[False, False]).head(6)
-    rec_categories = [dict(cat=x['cat'], n_products=int(x['n_products']), n_reviews=int(x['n_reviews']),
-                           pos_ratio=float(x['pos_ratio']), avg=float(x['avg_rating'])) for _, x in catg.iterrows()]
+    rec_categories = []
+    for _, x in catg.iterrows():
+        members = pool[pool['cat'] == x['cat']].sort_values(['pos_ratio', 'n_total'], ascending=[False, False])
+        plist = [dict(name=mm['상품명'], pos_ratio=float(mm['pos_ratio']), avg=float(mm['avg']), n=int(mm['n_total']))
+                 for _, mm in members.head(30).iterrows()]
+        rec_categories.append(dict(cat=x['cat'], n_products=int(x['n_products']), n_reviews=int(x['n_reviews']),
+                               pos_ratio=float(x['pos_ratio']), avg=float(x['avg_rating']), products=plist))
 
     # (2) 유사 상품 추천: 상위 5개 앵커 각각에 대해 키워드 자카드 유사 상품 top3
     anchors = list(top_count['상품코드'])[:5]
