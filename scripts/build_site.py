@@ -53,7 +53,7 @@ def nav_html(active_file: str, month_list):
 
 NAV_CSS = '''
 <style>
-.navwrap{max-width:920px;margin:0 auto 0;padding:18px 24px 0;font-family:Pretendard,system-ui,sans-serif}
+.navwrap{max-width:1140px;margin:0 auto 0;padding:18px 32px 0;font-family:Pretendard,system-ui,sans-serif}
 .navrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
 .navlbl{font-size:12px;font-weight:700;color:#9a8f7d;width:38px;flex:none}
 .navbtn{font-size:12.5px;font-weight:600;color:#6E6B63;text-decoration:none;
