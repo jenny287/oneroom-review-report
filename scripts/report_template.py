@@ -6,6 +6,54 @@ def f2(x): return f"{x:.2f}"
 esc = html.escape
 PUSH_BADGE = '<span class="push">▲ 적극 추진</span>'
 
+def render_rec(rec):
+    if not rec: return ""
+    cats = rec.get("categories", [])
+    sims = rec.get("similar", [])
+    grps = rec.get("groups", [])
+
+    # (1) 카테고리 추천
+    cat_rows = ""
+    for c in cats:
+        cat_rows += (f'<tr><td>{esc(c["cat"])}</td><td class="num">{c["n_products"]:,}</td>'
+                     f'<td class="num">{c["n_reviews"]:,}</td><td class="num pos">{f2(c["pos_ratio"])}%</td>'
+                     f'<td class="num">★{f2(c["avg"])}</td></tr>')
+
+    # (2) 유사 상품 추천
+    sim_html = ""
+    for s in sims:
+        items = ""
+        for it in s["items"]:
+            shared = " · ".join(esc(w) for w in it["shared"])
+            items += (f'<li><b>{esc(it["name"])}</b> '
+                      f'<span class="rmeta">긍정 {f2(it["pos_ratio"])}% · ★{f2(it["avg"])} · 후기 {it["n"]:,}</span>'
+                      f'<br><span class="shared">공통 키워드: {shared}</span></li>')
+        sim_html += (f'<div class="simblock"><div class="anchor">‘{esc(s["anchor"])}’ 와 비슷한 강점의 상품</div>'
+                     f'<ul class="simlist">{items}</ul></div>')
+
+    # (3) 상품군 추천
+    grp_html = ""
+    for g in grps:
+        items = " · ".join(f'{esc(it["name"])} ({f2(it["pos_ratio"])}%)' for it in g["items"])
+        grp_html += (f'<div class="grpblock"><span class="grpkw">{esc(g["keyword"])}</span>'
+                     f'<span class="grpcnt">강점 상품 {g["n_products"]}개</span>'
+                     f'<div class="grpitems">{items}</div></div>')
+
+    return f'''<section>
+<h2>④ 판매 추천 <span class="tag">리뷰·키워드 기반 · 무엇을 더 밀지</span></h2>
+<p class="lead">후기 20건 이상 상품을 대상으로, 만족도와 키워드를 분석해 판매를 확대할 후보를 제안합니다. 참고용 데이터이며 최종 판단은 운영 맥락과 함께 보세요.</p>
+
+<h3 class="rec-h">카테고리 추천 <span class="rtag">만족도 높은 카테고리</span></h3>
+<table><thead><tr><th>카테고리</th><th class="num">상품수</th><th class="num">후기</th><th class="num">긍정비율</th><th class="num">평균별점</th></tr></thead>
+<tbody>{cat_rows}</tbody></table>
+
+<h3 class="rec-h">유사 상품 추천 <span class="rtag">인기 상품과 강점이 겹치는 상품</span></h3>
+<div class="simwrap">{sim_html}</div>
+
+<h3 class="rec-h">상품군 추천 <span class="rtag">같은 강점을 공유하는 상품 묶음</span></h3>
+<div class="grpwrap">{grp_html}</div>
+</section>'''
+
 def HTML_TEMPLATE(d):
     s = d['summary']; bm = d['bench']
 
@@ -33,11 +81,27 @@ def HTML_TEMPLATE(d):
           <td class="num">{int(nt):,}</td><td class="num pos">{f2(pr)}%</td><td class="num">★{f2(avg)}</td></tr>'''
 
     cards = ""
-    for p in d['products']:
+    import json as _json
+    for idx, p in enumerate(d['products']):
         chips = "".join(
             f'<span class="{"chip sig" if sig else "chip"}">{esc(w)}<i>{c}</i></span>'
             for w, c, sig in p['chips'])
-        qs = "".join(f'<blockquote>“{esc(q)}”</blockquote>' for q in p['quotes'])
+        qlist = p.get('quotes', [])
+        # 앞 2개는 기본 노출, 나머지(최대 10)는 숨김(.extra)
+        qhtml = ""
+        for qi, q in enumerate(qlist):
+            cls = "qt" if qi < 2 else "qt extra"
+            qhtml += f'<blockquote class="{cls}">“{esc(q)}”</blockquote>'
+        dls = p.get('downloads', [])
+        more_avail = p.get('n_total', 0) > len(qlist)   # 표시분보다 실제 후기가 더 많으면 다운로드 제공
+        # 토글/다운로드 버튼 (보여줄 게 2개 초과이거나, 더 받을 게 있을 때만)
+        btn = ""
+        if len(qlist) > 2 or more_avail:
+            dl_json = esc(_json.dumps(dls, ensure_ascii=False))
+            btn = (f'<button class="morebtn" data-idx="{idx}" data-total="{len(qlist)}" '
+                   f'data-more="{1 if more_avail else 0}" data-name="{esc(p["name"])}" '
+                   f'onclick="onMore(this)">더보기</button>'
+                   f'<script type="application/json" id="dl-{idx}">{dl_json}</script>')
         ratio_cls = "warn" if p['pos_ratio'] < 85 else "pos"
         cards += f'''<article class="{'card is-push' if p['push'] else 'card'}">
           <header class="card-h">
@@ -51,8 +115,13 @@ def HTML_TEMPLATE(d):
           </header>
           <div class="chips">{chips}</div>
           <p class="why">{esc(p['note'])}</p>
-          <div class="quotes">{qs}</div>
+          <div class="quotes" data-card="{idx}">{qhtml}</div>
+          {btn}
         </article>'''
+
+    # 추천 섹션(④) HTML
+    rec = d.get('rec', {})
+    rec_html = render_rec(rec)
 
     return f'''<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8">
@@ -65,7 +134,8 @@ def HTML_TEMPLATE(d):
 --green:#2F7A57;--green-soft:#E6F1EA;--warn:#B85638;--line:#E7E3DA;--chip:#F1EEE6;}}
 *{{box-sizing:border-box}}
 body{{margin:0;background:var(--paper);color:var(--ink);font-family:Pretendard,system-ui,sans-serif;
-line-height:1.6;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum";}}
+line-height:1.6;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum";
+word-break:keep-all;overflow-wrap:break-word;}}
 .wrap{{max-width:920px;margin:0 auto;padding:56px 24px 96px}}
 .eyebrow{{font-size:13px;letter-spacing:.14em;color:var(--amber);font-weight:700;text-transform:uppercase}}
 h1{{font-size:34px;font-weight:800;letter-spacing:-.02em;margin:.3em 0 .1em;line-height:1.2}}
@@ -128,17 +198,37 @@ font-weight:700;padding:2px 9px;border-radius:20px;background:var(--paper)}}
 .why{{font-size:13.5px;line-height:1.7;margin:0 0 14px;color:#33312C}}
 blockquote{{margin:8px 0 0;padding:9px 13px;background:var(--chip);border-radius:0 10px 10px 0;
 border-left:3px solid var(--amber);font-size:12.5px;color:#4A4842;line-height:1.55}}
+.qt.extra{{display:none}}
+.morebtn{{margin-top:10px;font-size:12px;font-weight:700;color:#6E6B63;background:#fff;
+border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}}
+.morebtn:hover{{border-color:var(--amber);color:#9a5a08}}
+.rec-h{{font-size:15px;font-weight:800;margin:26px 0 10px;display:flex;align-items:baseline;gap:8px}}
+.rec-h .rtag{{font-size:12px;font-weight:600;color:var(--muted)}}
+.simwrap{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}
+.simblock{{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:#fff}}
+.anchor{{font-size:13px;font-weight:800;margin-bottom:8px;color:#33312C}}
+.simlist{{margin:0;padding-left:18px;font-size:12.5px;line-height:1.7}}
+.simlist li{{margin-bottom:7px}}
+.shared{{color:#9a5a08;font-size:11.5px}}
+.simlist .rmeta{{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}}
+.grpwrap{{display:flex;flex-direction:column;gap:8px}}
+.grpblock{{border:1px solid var(--line);border-radius:10px;padding:11px 14px;background:#fff;
+display:flex;align-items:center;gap:12px;flex-wrap:wrap}}
+.grpkw{{background:var(--amber-soft);color:#9a5a08;border:1px solid #F1D9B8;border-radius:8px;
+padding:3px 10px;font-size:13px;font-weight:700;flex:none}}
+.grpcnt{{font-size:11.5px;color:var(--muted);flex:none}}
+.grpitems{{font-size:12.5px;color:#4A4842;flex:1 1 100%}}
 .legend{{font-size:12px;color:var(--muted);margin:14px 0 0;display:flex;gap:18px;flex-wrap:wrap}}
 .legend span{{display:inline-flex;align-items:center;gap:6px}}
 .dot{{width:11px;height:11px;border-radius:3px;display:inline-block}}
 footer{{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);line-height:1.7}}
 footer b{{color:var(--ink)}}
-@media(max-width:680px){{.band{{grid-template-columns:repeat(2,1fr)}}.cards{{grid-template-columns:1fr}}
+@media(max-width:680px){{.band{{grid-template-columns:repeat(2,1fr)}}.cards{{grid-template-columns:1fr}}.simwrap{{grid-template-columns:1fr}}
 .rrow{{grid-template-columns:22px 1fr 64px}}.rrow .rbar,.rrow .rmeta{{display:none}}h1{{font-size:27px}}}}
 </style></head>
 <body><div class="wrap">
 
-<div class="eyebrow">원룸만들기 · 알파리뷰 분석</div>
+<div class="eyebrow">원룸만들기 · 고객 리뷰 분석</div>
 <h1>긍정 리뷰가 많은 상품과<br>고객이 만족하는 이유</h1>
 <div class="sub">분석 기간 {s['period']} · 해당 기간 작성 리뷰 기준</div>
 <div class="meta-note">선택 기간 내 고객 후기 <b>{s['N_cust']:,}건</b> 기준 (판매자 작성 후기 제외). 긍정 = 별점 {4}점 이상. 키워드는 자유 텍스트 후기에서만 추출했으며, 정해진 문구를 클릭하는 '빠른리뷰'와 네이버페이 자동 문구는 제외했습니다. 모든 수치는 소수점 2자리 반올림.</div>
@@ -152,7 +242,7 @@ footer b{{color:var(--ink)}}
 
 <div class="bench">
   <h4>📊 타 쇼핑몰 대비 객관적 위치</h4>
-  <p>업계 벤치마크상 이커머스 상품의 <b>평균 별점은 {bm['ind_avg']}★</b>(≈90% 환산)이고, 좋은 평점대는 4.0~4.7★, 4.75★가 전환율 최상위 '북극성' 기준입니다. 90% 이상이면 최상위로 강한 고객 호응을 뜻합니다.</p>
+  <p>업계 벤치마크상 이커머스 상품의 <b>평균 별점은 {bm['ind_avg']}★</b>(≈90% 환산)입니다. 평점이 4.0~4.7★ 구간일 때 실제 구매로 이어지는 비율(전환율)이 가장 높게 나오는 경향이 있고, 90% 이상이면 최상위로 강한 고객 호응을 뜻합니다. (별점이 무조건 높다고 좋은 건 아니며, 5.0★처럼 너무 완벽하면 오히려 신뢰도가 떨어지기도 합니다.)</p>
   <p>원룸만들기 매장 전체는 <b>평균 {f2(s['avg'])}★ · 긍정 {f2(s['pos_ratio'])}%</b>로 업계 평균({bm['ind_avg']}★) 수준입니다. 그 위로 명확히 올라서는 상품을 '적극 추진 후보'로 표시했습니다.</p>
   <div class="crit">적극 추진 기준 (시장 평균 상회): <b>평균 ★{bm['avg']} 이상 + 긍정 비율 {int(bm['ratio'])}% 이상 + 후기 {bm['min_n']}건 이상</b> &nbsp;→ 전체 {s['n_prod']:,}개 상품 중 <b>{bm['n_push']}개</b>가 해당. 아래 <span class="push">▲ 적극 추진</span> 표시.</div>
   <p class="src">출처: PowerReviews(25.4M+ 상품 페이지 분석), Amazon 평점 기준 등 공개 이커머스 벤치마크</p>
@@ -190,13 +280,54 @@ footer b{{color:var(--ink)}}
 <div class="cards">{cards}</div>
 </section>
 
+{rec_html}
+
 <footer>
 <b>분석 방법</b><br>
-· 데이터: 알파리뷰 내보내기 CSV ({s['N_all']:,}건), 분석 기간 {s['period']}<br>
+· 데이터: 카페24 리뷰 데이터 연동 (게시판 API 자동 수집, {s['N_all']:,}건), 분석 기간 {s['period']}<br>
 · 긍정 정의: 별점 4점 이상 (5점 비중이 커 긍정 쏠림이 큼)<br>
-· 제외 처리: 판매자(관리자) 작성 후기, 클릭형 '빠른리뷰', 네이버페이 자동 삽입 문구<br>
+· 제외 처리: 판매자(관리자) 작성 후기, 클릭형 '빠른리뷰', 네이버페이 자동 삽입 문구, 본문 HTML 태그<br>
 · 키워드: 한국어 형태소 분석(명사·형용사) 추출, 후기당 중복 1회 집계, 동의어 통합, 부정어는 카테고리 키워드에서 제외<br>
-· 적극 추진 기준: 평균 ★{bm['avg']}+ · 긍정 {int(bm['ratio'])}%+ · 후기 {bm['min_n']}건+ (업계 평균 {bm['ind_avg']}★ / 90% 상회) · 모든 수치 소수점 2자리 반올림
+· 적극 추진 기준: 평균 ★{bm['avg']}+ · 긍정 {int(bm['ratio'])}%+ · 후기 {bm['min_n']}건+ (업계 평균 {bm['ind_avg']}★ / 90% 상회) · 모든 수치 소수점 2자리 반올림<br>
+· 추천: 후기 20건 이상 상품 대상. 유사 상품=키워드 자카드 유사도, 카테고리/상품군=만족도 기준 (참고용)
 </footer>
+
+<script>
+function onMore(btn){{
+  var card = btn.closest('article');
+  var extras = card.querySelectorAll('.quotes .qt.extra');
+  var expanded = btn.getAttribute('data-expanded') === '1';
+  if(!expanded){{
+    extras.forEach(function(e){{ e.style.display='block'; }});
+    btn.setAttribute('data-expanded','1');
+    if(btn.getAttribute('data-more') === '1'){{ btn.textContent='더 많이 보기 (리뷰 내려받기)'; }}
+    else {{ btn.style.display='none'; }}
+  }} else {{
+    // 두 번째 클릭 = 다운로드
+    downloadReviews(btn);
+  }}
+}}
+function downloadReviews(btn){{
+  var idx = btn.getAttribute('data-idx');
+  var name = btn.getAttribute('data-name') || 'reviews';
+  var el = document.getElementById('dl-'+idx);
+  if(!el) return;
+  var rows;
+  try {{ rows = JSON.parse(el.textContent); }} catch(e){{ return; }}
+  var head = ['별점','작성일','리뷰내용'];
+  var lines = [head.join(',')];
+  rows.forEach(function(r){{
+    var c = '"' + String(r.content||'').replace(/"/g,'""') + '"';
+    lines.push([r.rating, r.date, c].join(','));
+  }});
+  var csv = '\\uFEFF' + lines.join('\\n');
+  var blob = new Blob([csv], {{type:'text/csv;charset=utf-8;'}});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = name.replace(/[^\\w가-힣]+/g,'_') + '_리뷰.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}}
+</script>
 
 </div></body></html>'''
