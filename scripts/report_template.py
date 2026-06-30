@@ -5,6 +5,9 @@ import html
 def f2(x): return f"{x:.2f}"
 esc = html.escape
 PUSH_BADGE = '<span class="push">▲ 적극 추진</span>'
+WATCH_BADGE = '<span class="watch">△ 추진 검토</span>'
+def badge(push, watch):
+    return PUSH_BADGE if push else (WATCH_BADGE if watch else '')
 
 def render_rec(rec):
     if not rec: return ""
@@ -74,19 +77,21 @@ def HTML_TEMPLATE(d):
 
     mxp = d['top_count'][0][2] if d['top_count'] else 1
     rankA = ""
-    for i, (name, nt, npos, pr, avg, push) in enumerate(d['top_count'], 1):
+    for i, (name, nt, npos, pr, avg, push, watch) in enumerate(d['top_count'], 1):
         pct = round(npos / mxp * 100)
-        rankA += f'''<div class="rrow{' is-push' if push else ''}">
+        cls = ' is-push' if push else (' is-watch' if watch else '')
+        rankA += f'''<div class="rrow{cls}">
           <div class="rnum">{i}</div>
-          <div class="rname">{esc(name)} {PUSH_BADGE if push else ''}</div>
+          <div class="rname">{esc(name)} {badge(push, watch)}</div>
           <div class="rbar"><div class="bar"><div class="bar-fill" style="width:{pct}%;background:var(--green)"></div></div></div>
           <div class="rpos">{int(npos):,}</div>
           <div class="rmeta">{f2(pr)}% · ★{f2(avg)}</div>
         </div>'''
 
     rankB = ""
-    for i, (name, nt, npos, pr, avg, push) in enumerate(d['top_ratio'], 1):
-        rankB += f'''<tr class="{'is-push' if push else ''}"><td class="bi">{i}</td><td>{esc(name)} {PUSH_BADGE if push else ''}</td>
+    for i, (name, nt, npos, pr, avg, push, watch) in enumerate(d['top_ratio'], 1):
+        cls = 'is-push' if push else ('is-watch' if watch else '')
+        rankB += f'''<tr class="{cls}"><td class="bi">{i}</td><td>{esc(name)} {badge(push, watch)}</td>
           <td class="num">{int(nt):,}</td><td class="num pos">{f2(pr)}%</td><td class="num">★{f2(avg)}</td></tr>'''
 
     cards = ""
@@ -113,9 +118,9 @@ def HTML_TEMPLATE(d):
                     f'onclick="downloadReviews(this)">리뷰 내려받기 ({len(dls)}개)</button>'
                     f'<script type="application/json" id="dl-{idx}">{dl_json}</script>')
         ratio_cls = "warn" if p['pos_ratio'] < 85 else "pos"
-        cards += f'''<article class="{'card is-push' if p['push'] else 'card'}">
+        cards += f'''<article class="{'card is-push' if p['push'] else ('card is-watch' if p.get('watch') else 'card')}">
           <header class="card-h">
-            <div class="card-top"><span class="cat">{esc(p['cat'])}</span>{PUSH_BADGE if p['push'] else ''}</div>
+            <div class="card-top"><span class="cat">{esc(p['cat'])}</span>{badge(p['push'], p.get('watch'))}</div>
             <h3>{esc(p['name'])}</h3>
             <div class="card-stats">
               <span class="st"><b>{p['n_pos']:,}</b><small>긍정 후기</small></span>
@@ -170,6 +175,8 @@ border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:28px}
 .bench .src{{font-size:11.5px;color:var(--muted);margin-top:10px}}
 .push{{display:inline-block;background:var(--green);color:#fff;font-size:11px;font-weight:700;
 padding:2px 8px;border-radius:20px;vertical-align:middle;white-space:nowrap;letter-spacing:.02em}}
+.watch{{display:inline-block;background:var(--amber-soft);color:#9a5a08;border:1px solid #ECCB97;
+font-size:11px;font-weight:700;padding:1px 8px;border-radius:20px;vertical-align:middle;white-space:nowrap;letter-spacing:.02em}}
 .bar{{height:9px;background:var(--chip);border-radius:6px;overflow:hidden}}
 .bar-fill{{height:100%;border-radius:6px}}
 .kwrow{{display:grid;grid-template-columns:96px 1fr 56px;align-items:center;gap:14px;padding:5px 0}}
@@ -179,6 +186,7 @@ padding:2px 8px;border-radius:20px;vertical-align:middle;white-space:nowrap;lett
 .rrow{{display:grid;grid-template-columns:26px 1.5fr 1fr 64px 110px;align-items:center;gap:14px;
 padding:11px 8px;border-bottom:1px solid var(--line);border-radius:8px}}
 .rrow.is-push{{background:var(--green-soft)}}
+.rrow.is-watch{{background:var(--amber-soft)}}
 .rnum{{font-weight:800;color:var(--muted);font-size:14px;text-align:center}}
 .rname{{font-weight:600;font-size:14.5px}}
 .rpos{{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}}
@@ -190,9 +198,11 @@ td.num,th.num{{text-align:right;font-variant-numeric:tabular-nums}}
 td.bi{{color:var(--muted);font-weight:700;width:30px}}
 td.pos{{color:var(--green);font-weight:700}}
 tr.is-push td{{background:var(--green-soft)}}
+tr.is-watch td{{background:var(--amber-soft)}}
 .cards{{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}}
 .card{{border:1px solid var(--line);border-radius:16px;padding:22px;background:#fff}}
 .card.is-push{{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset}}
+.card.is-watch{{border-color:#ECCB97;box-shadow:0 0 0 1px #ECCB97 inset}}
 .card-top{{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px}}
 .cat{{display:inline-block;border:1px solid var(--line);color:var(--muted);font-size:11.5px;
 font-weight:700;padding:2px 9px;border-radius:20px;background:var(--paper)}}
@@ -283,8 +293,8 @@ footer b{{color:var(--ink)}}
 <div class="bench">
   <h4>📊 타 쇼핑몰 대비 객관적 위치</h4>
   <p>업계 벤치마크상 이커머스 상품의 <b>평균 별점은 {bm['ind_avg']}★</b>(≈90% 환산)입니다.<br>평점이 4.0~4.7★ 구간일 때 실제 구매로 이어지는 비율(전환율)이 가장 높게 나오는 경향이 있고, 90% 이상이면 최상위로 강한 고객 호응을 뜻합니다.<br>(별점이 무조건 높다고 좋은 건 아니며, 5.0★처럼 너무 완벽하면 오히려 신뢰도가 떨어지기도 합니다.)</p>
-  <p>원룸만들기 매장 전체는 <b>평균 {f2(s['avg'])}★ · 긍정 {f2(s['pos_ratio'])}%</b>로 업계 평균({bm['ind_avg']}★) 수준입니다.<br>그 위로 명확히 올라서는 상품을 '적극 추진 후보'로 표시했습니다.</p>
-  <div class="crit">적극 추진 기준 (시장 평균 상회): <b>평균 ★{bm['avg']} 이상 + 긍정 비율 {int(bm['ratio'])}% 이상 + 후기 {bm['min_n']}건 이상</b><br>→ 전체 {s['n_prod']:,}개 상품 중 <b>{bm['n_push']}개</b>가 해당. 아래 <span class="push">▲ 적극 추진</span> 표시.</div>
+  <p>원룸만들기 매장 전체는 <b>평균 {f2(s['avg'])}★ · 긍정 {f2(s['pos_ratio'])}%</b>로 업계 평균({bm['ind_avg']}★) 수준입니다.<br>그 위로 올라서는 상품을 두 단계('적극 추진' / '추진 검토')로 표시했습니다.</p>
+  <div class="crit"><span class="push">▲ 적극 추진</span> <b>평균 ★{bm['avg']} 이상 + 긍정 {int(bm['ratio'])}% 이상 + 후기 {bm['min_n']}건 이상</b> → 전체 {s['n_prod']:,}개 중 <b>{bm['n_push']}개</b><br><span class="watch">△ 추진 검토</span> <b>평균 ★{bm['watch_avg']} 이상 + 긍정 {int(bm['watch_ratio'])}% 이상 + 후기 {bm['min_n']}건 이상</b> (적극 추진 제외) → <b>{bm['n_watch']}개</b></div>
   <p class="src">출처: PowerReviews(25.4M+ 상품 페이지 분석), Amazon 평점 기준 등 공개 이커머스 벤치마크</p>
 </div>
 
@@ -315,7 +325,8 @@ footer b{{color:var(--ink)}}
 <div class="legend">
   <span><span class="dot" style="background:var(--amber-soft);border:1px solid #F1D9B8"></span> 카테고리 핵심 긍정 키워드</span>
   <span><span class="dot" style="background:var(--chip)"></span> 일반 키워드</span>
-  <span><span class="push" style="padding:1px 7px">▲ 적극 추진</span> 시장 평균 상회</span>
+  <span><span class="push" style="padding:1px 7px">▲ 적극 추진</span> 시장 평균 분명히 상회</span>
+  <span><span class="watch" style="padding:1px 7px">△ 추진 검토</span> 그다음 우수</span>
 </div>
 <div class="cards">{cards}</div>
 </section>
@@ -328,7 +339,7 @@ footer b{{color:var(--ink)}}
 · 긍정 정의: 별점 4점 이상 (5점 비중이 커 긍정 쏠림이 큼)<br>
 · 제외 처리: 판매자(관리자) 작성 후기, 클릭형 '빠른리뷰', 네이버페이 자동 삽입 문구, 본문 HTML 태그<br>
 · 키워드: 한국어 형태소 분석(명사·형용사) 추출, 후기당 중복 1회 집계, 동의어 통합, 부정어는 카테고리 키워드에서 제외<br>
-· 적극 추진 기준: 평균 ★{bm['avg']}+ · 긍정 {int(bm['ratio'])}%+ · 후기 {bm['min_n']}건+ (업계 평균 {bm['ind_avg']}★ / 90% 상회) · 모든 수치 소수점 2자리 반올림<br>
+· 적극 추진: 평균 ★{bm['avg']}+ · 긍정 {int(bm['ratio'])}%+ · 후기 {bm['min_n']}건+ / 추진 검토: 평균 ★{bm['watch_avg']}+ · 긍정 {int(bm['watch_ratio'])}%+ · 후기 {bm['min_n']}건+ (업계 평균 {bm['ind_avg']}★ / 90%) · 모든 수치 소수점 2자리 반올림<br>
 · 추천: 후기 20건 이상 상품 대상. 유사 상품=키워드 자카드 유사도, 카테고리/상품군=만족도 기준 (참고용)
 </footer>
 
