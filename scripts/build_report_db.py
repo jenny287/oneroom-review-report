@@ -128,7 +128,7 @@ COMPLAINT = re.compile(r'아쉽|안되|안돼|불량|별로|최악|망했|느림
 def load(csv_path):
     df = pd.read_csv(csv_path)
     df['리뷰내용'] = df['리뷰내용'].fillna('').astype(str)
-    df = df[~df['상품명'].astype(str).str.startswith('추가_')].copy()   # 옵션·사은품성 '추가_' 상품 제외
+    df = df[~df['상품명'].astype(str).str.startswith(('추가_', '별도_'))].copy()   # 옵션·사은품성 '추가_'/'별도_' 상품 제외
     cust = df.copy()                                       # 게시판 API엔 판매자 글이 없음(검증완료) → 전체가 고객후기
     cust['clean'] = cust['리뷰내용'].map(clean)
     cust['is_pos'] = cust['리뷰평점'] >= POS_MIN
