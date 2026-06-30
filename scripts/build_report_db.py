@@ -174,8 +174,8 @@ def quotes(cust, code, k=10):
     return out
 
 def download_rows(cust, code, cap=100):
-    # 다운로드용: 해당 상품의 모든 리뷰(별점·작성일·내용) 최신순 최대 cap개
-    s = cust[cust['상품코드'] == code].sort_values('dt', ascending=False)
+    # 다운로드용: 고객이 직접 작성한 후기만(빠른리뷰 템플릿 제외) 최신순 최대 cap개
+    s = cust[(cust['상품코드'] == code) & (cust['is_quick'] == False)].sort_values('dt', ascending=False)
     rows = []
     for _, r in s.head(cap).iterrows():
         rows.append({
