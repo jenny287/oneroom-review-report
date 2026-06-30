@@ -12,18 +12,17 @@ def render_rec(rec):
     sims = rec.get("similar", [])
     grps = rec.get("groups", [])
 
-    # (1) 카테고리 추천 — 행 클릭 시 해당 카테고리 상품 목록 펼침
+    # (1) 카테고리 추천 — 행 클릭 시 해당 카테고리 상품이 표 컬럼에 맞춰 펼쳐짐
     cat_rows = ""
-    for c in cats:
-        cat_rows += (f'<tr class="catrow" onclick="onCatRow(this)"><td>{esc(c["cat"])}</td>'
+    for gi, c in enumerate(cats):
+        cat_rows += (f'<tr class="catrow" onclick="onCatRow(this)" data-grp="{gi}"><td>{esc(c["cat"])}</td>'
                      f'<td class="num">{c["n_products"]:,}</td>'
                      f'<td class="num">{c["n_reviews"]:,}</td><td class="num pos">{f2(c["pos_ratio"])}%</td>'
                      f'<td class="num">★{f2(c["avg"])}</td></tr>')
-        prods = ""
         for pr in c.get("products", []):
-            prods += (f'<div class="cp"><b>{esc(pr["name"])}</b>'
-                      f'<span class="cpm">긍정 {f2(pr["pos_ratio"])}% · ★{f2(pr["avg"])} · 후기 {pr["n"]:,}</span></div>')
-        cat_rows += f'<tr class="catdetail"><td colspan="5"><div class="catprods">{prods}</div></td></tr>'
+            cat_rows += (f'<tr class="prow prow-{gi}"><td colspan="2" class="pname">{esc(pr["name"])}</td>'
+                         f'<td class="num">{pr["n"]:,}</td><td class="num pos">{f2(pr["pos_ratio"])}%</td>'
+                         f'<td class="num">★{f2(pr["avg"])}</td></tr>')
 
     # (2) 유사 상품 추천
     sim_html = ""
@@ -37,20 +36,24 @@ def render_rec(rec):
         sim_html += (f'<div class="simblock"><div class="anchor">‘{esc(s["anchor"])}’ 와 비슷한 강점의 상품</div>'
                      f'<ul class="simlist">{items}</ul></div>')
 
-    # (3) 상품군 추천
+    # (3) 상품군 추천 — 키워드 > 카테고리 > 상품
     grp_html = ""
     for g in grps:
-        items = " · ".join(f'{esc(it["name"])} ({f2(it["pos_ratio"])}%)' for it in g["items"])
-        grp_html += (f'<div class="grpblock"><span class="grpkw">{esc(g["keyword"])}</span>'
-                     f'<span class="grpcnt">강점 상품 {g["n_products"]}개</span>'
-                     f'<div class="grpitems">{items}</div></div>')
+        cat_blocks = ""
+        for cb in g.get("cats", []):
+            names = " · ".join(f'{esc(it["name"])} ({f2(it["pos_ratio"])}%)' for it in cb["items"])
+            cat_blocks += (f'<div class="grpcat"><span class="grpcatname">{esc(cb["cat"])}'
+                           f'<i>{cb["n"]}개</i></span><span class="grpcatitems">{names}</span></div>')
+        grp_html += (f'<div class="grpblock"><div class="grphead"><span class="grpkw">{esc(g["keyword"])}</span>'
+                     f'<span class="grpcnt">강점 상품 {g["n_products"]}개</span></div>'
+                     f'<div class="grpcats">{cat_blocks}</div></div>')
 
     return f'''<section>
-<h2>④ 판매 추천 <span class="tag">리뷰·키워드 기반 · 무엇을 더 밀지</span></h2>
+<h2 id="sec4">④ 판매 추천 <span class="tag">리뷰·키워드 기반 · 무엇을 더 밀지</span></h2>
 <p class="lead">후기 20건 이상 상품을 대상으로, 만족도와 키워드를 분석해 판매를 확대할 후보를 제안합니다. 참고용 데이터이며 최종 판단은 운영 맥락과 함께 보세요.</p>
 
 <h3 class="rec-h">카테고리 추천 <span class="rtag">만족도 높은 카테고리 · 행을 클릭하면 상품 목록</span></h3>
-<table><thead><tr><th>카테고리</th><th class="num">상품수</th><th class="num">후기</th><th class="num">긍정비율</th><th class="num">평균별점</th></tr></thead>
+<table><thead><tr><th>카테고리</th><th class="num help" title="후기 20건 이상인 상품의 개수">상품수</th><th class="num help" title="해당 상품들의 전체 후기 수 (긍정·부정 모두 포함)">후기</th><th class="num help" title="전체 후기 중 별점 4점 이상(긍정) 비율">긍정비율</th><th class="num help" title="해당 상품들의 평균 별점을 다시 평균낸 값">평균별점</th></tr></thead>
 <tbody>{cat_rows}</tbody></table>
 
 <h3 class="rec-h">유사 상품 추천 <span class="rtag">인기 상품과 강점이 겹치는 상품</span></h3>
@@ -105,9 +108,9 @@ def HTML_TEMPLATE(d):
             btn += (f'<button class="morebtn" data-idx="{idx}" onclick="onToggle(this)">'
                     f'더보기 (+{len(qlist)-2})</button>')
         if more_avail and dls:
-            dl_json = esc(_json.dumps(dls, ensure_ascii=False))
+            dl_json = _json.dumps(dls, ensure_ascii=False).replace('<', '\\u003c')
             btn += (f'<button class="dlbtn" data-idx="{idx}" data-name="{esc(p["name"])}" '
-                    f'onclick="downloadReviews(this)">리뷰 내려받기</button>'
+                    f'onclick="downloadReviews(this)">리뷰 내려받기 ({len(dls)}개)</button>'
                     f'<script type="application/json" id="dl-{idx}">{dl_json}</script>')
         ratio_cls = "warn" if p['pos_ratio'] < 85 else "pos"
         cards += f'''<article class="{'card is-push' if p['push'] else 'card'}">
@@ -140,6 +143,7 @@ def HTML_TEMPLATE(d):
 :root{{--paper:#FAF9F6;--ink:#1B1A17;--muted:#6E6B63;--amber:#D98313;--amber-soft:#FBEFDD;
 --green:#2F7A57;--green-soft:#E6F1EA;--warn:#B85638;--line:#E7E3DA;--chip:#F1EEE6;}}
 *{{box-sizing:border-box}}
+html{{scroll-behavior:smooth}}
 body{{margin:0;background:var(--paper);color:var(--ink);font-family:Pretendard,system-ui,sans-serif;
 line-height:1.6;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum";
 word-break:keep-all;overflow-wrap:break-word;}}
@@ -217,12 +221,23 @@ tr.catrow{{cursor:pointer}}
 tr.catrow:hover td{{background:var(--amber-soft)}}
 tr.catrow td:first-child::before{{content:'▸';color:var(--amber);font-size:11px;margin-right:7px;display:inline-block}}
 tr.catrow.open td:first-child::before{{content:'▾'}}
-tr.catdetail{{display:none}}
-tr.catdetail>td{{background:#FbF9F4;padding:0 14px 12px}}
-.catprods{{display:grid;grid-template-columns:1fr 1fr;gap:4px 28px;padding:10px 4px 4px}}
-.catprods .cp{{display:flex;justify-content:space-between;font-size:12px;color:#4A4842;padding:3px 0;border-bottom:1px solid #EFEAE0}}
-.catprods .cp b{{font-weight:600}}
-.catprods .cpm{{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:10px}}
+tr.prow{{display:none;background:#FbF9F4}}
+tr.prow>td{{padding:6px 14px;font-size:12px;color:#4A4842;border-bottom:1px solid #EFEAE0}}
+tr.prow .pname{{padding-left:30px;font-weight:600}}
+tr.prow .pname::before{{content:'·';color:var(--amber);margin-right:8px}}
+th.help{{cursor:help;text-decoration:underline dotted #C9C2B4;text-underline-offset:3px}}
+.sidenav{{position:fixed;right:18px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;z-index:50}}
+.sidenav a{{position:relative;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;
+justify-content:center;background:rgba(255,255,255,.95);border:1px solid var(--line);
+box-shadow:0 1px 5px rgba(0,0,0,.07);text-decoration:none;transition:border-color .15s}}
+.sidenav a b{{font-size:15px;color:var(--amber);font-weight:800}}
+.sidenav a:hover{{border-color:var(--amber)}}
+.sidenav a .lbl{{position:absolute;right:50px;white-space:nowrap;background:rgba(255,255,255,.97);
+border:1px solid var(--line);border-radius:16px;padding:5px 12px;font-size:11.5px;font-weight:700;
+color:#4A4842;opacity:0;pointer-events:none;transition:opacity .15s;box-shadow:0 1px 5px rgba(0,0,0,.07)}}
+.sidenav a:hover .lbl{{opacity:1}}
+h2[id]{{scroll-margin-top:20px}}
+@media(max-width:1080px){{.sidenav{{display:none}}}}
 .rec-h{{font-size:15px;font-weight:800;margin:26px 0 10px;display:flex;align-items:baseline;gap:8px}}
 .rec-h .rtag{{font-size:12px;font-weight:600;color:var(--muted)}}
 .simwrap{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}
@@ -232,13 +247,18 @@ tr.catdetail>td{{background:#FbF9F4;padding:0 14px 12px}}
 .simlist li{{margin-bottom:7px}}
 .shared{{color:#9a5a08;font-size:11.5px}}
 .simlist .rmeta{{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}}
-.grpwrap{{display:flex;flex-direction:column;gap:8px}}
-.grpblock{{border:1px solid var(--line);border-radius:10px;padding:11px 14px;background:#fff;
-display:flex;align-items:center;gap:12px;flex-wrap:wrap}}
+.grpwrap{{display:flex;flex-direction:column;gap:10px}}
+.grpblock{{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fff}}
+.grphead{{display:flex;align-items:center;gap:10px;margin-bottom:8px}}
 .grpkw{{background:var(--amber-soft);color:#9a5a08;border:1px solid #F1D9B8;border-radius:8px;
-padding:3px 10px;font-size:13px;font-weight:700;flex:none}}
-.grpcnt{{font-size:11.5px;color:var(--muted);flex:none}}
-.grpitems{{font-size:12.5px;color:#4A4842;flex:1 1 100%}}
+padding:3px 10px;font-size:13px;font-weight:700}}
+.grpcnt{{font-size:11.5px;color:var(--muted)}}
+.grpcats{{display:flex;flex-direction:column;gap:6px}}
+.grpcat{{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:baseline;
+padding:5px 0;border-top:1px solid #F0ECE3}}
+.grpcatname{{font-size:12px;font-weight:700;color:#33312C}}
+.grpcatname i{{font-style:normal;color:var(--muted);font-weight:500;margin-left:5px;font-size:11px}}
+.grpcatitems{{font-size:12px;color:#4A4842;line-height:1.6}}
 .legend{{font-size:12px;color:var(--muted);margin:14px 0 0;display:flex;gap:18px;flex-wrap:wrap}}
 .legend span{{display:inline-flex;align-items:center;gap:6px}}
 .dot{{width:11px;height:11px;border-radius:3px;display:inline-block}}
@@ -276,13 +296,13 @@ footer b{{color:var(--ink)}}
 </section>
 
 <section>
-<h2>① 긍정 리뷰가 많은 상품 <span class="tag">긍정 후기 절대 수 기준 TOP 12</span></h2>
+<h2 id="sec1">① 긍정 리뷰가 많은 상품 <span class="tag">긍정 후기 절대 수 기준 TOP 12</span></h2>
 <p class="lead">잘 팔리고 후기도 많은 핵심 상품. 시장 평균을 상회하는 상품은 <span class="push">▲ 적극 추진</span>으로 강조했습니다.</p>
 {rankA}
 </section>
 
 <section>
-<h2>② 만족도가 가장 높은 상품 <span class="tag">긍정 비율 기준 · 후기 {bm['min_n']}건 이상</span></h2>
+<h2 id="sec2">② 만족도가 가장 높은 상품 <span class="tag">긍정 비율 기준 · 후기 {bm['min_n']}건 이상</span></h2>
 <p class="lead">후기 수는 적어도 거의 불만이 없는 '숨은 만족 상품'. <span class="push">▲ 적극 추진</span> 상품은 객관적으로 시장 평균을 분명히 상회해, 판매 확대 시 리스크가 낮습니다.</p>
 <table>
 <thead><tr><th class="bi">#</th><th>상품명</th><th class="num">후기</th><th class="num">긍정비율</th><th class="num">평균별점</th></tr></thead>
@@ -291,7 +311,7 @@ footer b{{color:var(--ink)}}
 </section>
 
 <section>
-<h2>③ 상품별 심층 분석 <span class="tag">카테고리 · 만족 이유 · 실제 고객의 말</span></h2>
+<h2 id="sec3">③ 상품별 심층 분석 <span class="tag">카테고리 · 만족 이유 · 실제 고객의 말</span></h2>
 <p class="lead">긍정 후기 상위 {len(d['products'])}개 상품. 각 카드에 카테고리를 표시하고, 그 카테고리의 핵심 긍정 키워드를 <b style="color:#9a5a08">진한 색</b>으로 강조했습니다.</p>
 <div class="legend">
   <span><span class="dot" style="background:var(--amber-soft);border:1px solid #F1D9B8"></span> 카테고리 핵심 긍정 키워드</span>
@@ -313,6 +333,12 @@ footer b{{color:var(--ink)}}
 · 추천: 후기 20건 이상 상품 대상. 유사 상품=키워드 자카드 유사도, 카테고리/상품군=만족도 기준 (참고용)
 </footer>
 
+<nav class="sidenav" aria-label="섹션 바로가기">
+  <a href="#sec1"><b>①</b><span class="lbl">긍정 많은 상품</span></a>
+  <a href="#sec2"><b>②</b><span class="lbl">만족도 높은 상품</span></a>
+  <a href="#sec3"><b>③</b><span class="lbl">상품별 심층 분석</span></a>
+  <a href="#sec4"><b>④</b><span class="lbl">판매 추천</span></a>
+</nav>
 <script>
 function onToggle(btn){{
   var card = btn.closest('article');
@@ -329,32 +355,32 @@ function onToggle(btn){{
   }}
 }}
 function onCatRow(row){{
-  var detail = row.nextElementSibling;
-  if(!detail || !detail.classList.contains('catdetail')) return;
-  var open = detail.style.display === 'table-row';
-  detail.style.display = open ? 'none' : 'table-row';
+  var grp = row.getAttribute('data-grp');
+  var rows = document.querySelectorAll('.prow-'+grp);
+  var open = row.classList.contains('open');
+  rows.forEach(function(r){{ r.style.display = open ? 'none' : 'table-row'; }});
   row.classList.toggle('open', !open);
 }}
 function downloadReviews(btn){{
   var idx = btn.getAttribute('data-idx');
   var name = btn.getAttribute('data-name') || 'reviews';
   var el = document.getElementById('dl-'+idx);
-  if(!el) return;
+  if(!el){{ return; }}
   var rows;
-  try {{ rows = JSON.parse(el.textContent); }} catch(e){{ return; }}
-  var head = ['별점','작성일','리뷰내용'];
-  var lines = [head.join(',')];
-  rows.forEach(function(r){{
-    var c = '"' + String(r.content||'').replace(/"/g,'""') + '"';
-    lines.push([r.rating, r.date, c].join(','));
-  }});
-  var csv = '\\uFEFF' + lines.join('\\n');
+  try {{ rows = JSON.parse(el.textContent); }} catch(e){{ alert('리뷰 데이터를 읽지 못했습니다.'); return; }}
+  var NL = String.fromCharCode(10), BOM = String.fromCharCode(0xFEFF);
+  function cell(v){{ return '"' + String(v==null?'':v).replace(/"/g,'""') + '"'; }}
+  var lines = [['별점','작성일','리뷰내용'].join(',')];
+  rows.forEach(function(r){{ lines.push([cell(r.rating), cell(r.date), cell(r.content)].join(',')); }});
+  var csv = BOM + lines.join(NL);
   var blob = new Blob([csv], {{type:'text/csv;charset=utf-8;'}});
+  var fname = name.replace(/[^0-9A-Za-z가-힣]+/g,'_') + '_리뷰.csv';
+  if(window.navigator && window.navigator.msSaveOrOpenBlob){{ window.navigator.msSaveOrOpenBlob(blob, fname); return; }}
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
-  a.href = url; a.download = name.replace(/[^\\w가-힣]+/g,'_') + '_리뷰.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  a.href = url; a.download = fname; a.style.display='none';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){{ document.body.removeChild(a); URL.revokeObjectURL(url); }}, 120);
 }}
 </script>
 
