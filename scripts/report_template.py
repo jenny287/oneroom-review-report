@@ -53,7 +53,7 @@ def render_rec(rec):
 <p class="lead">후기 20건 이상 상품을 대상으로, 만족도와 키워드를 분석해 판매를 확대할 후보를 제안합니다. 참고용 데이터이며 최종 판단은 운영 맥락과 함께 보세요.</p>
 
 <h3 class="rec-h">카테고리 추천 <span class="rtag">만족도 높은 카테고리 · 행을 클릭하면 상품 목록</span></h3>
-<table><thead><tr><th>카테고리</th><th class="num help" title="후기 20건 이상인 상품의 개수">상품수</th><th class="num help" title="해당 상품들의 전체 후기 수 (긍정·부정 모두 포함)">후기</th><th class="num help" title="전체 후기 중 별점 4점 이상(긍정) 비율">긍정비율</th><th class="num help" title="해당 상품들의 평균 별점을 다시 평균낸 값">평균별점</th></tr></thead>
+<table><thead><tr><th>카테고리</th><th class="num help" title="후기 20건 이상인 상품의 개수">상품수</th><th class="num help" title="해당 상품들의 전체 후기 수 (긍정·부정 모두 포함)">후기</th><th class="num help" title="전체 후기 중 별점 4점 이상(긍정) 비율">긍정비율</th><th class="num help" title="해당 상품들의 평균 별점">평균별점</th></tr></thead>
 <tbody>{cat_rows}</tbody></table>
 
 <h3 class="rec-h">유사 상품 추천 <span class="rtag">인기 상품과 강점이 겹치는 상품</span></h3>
@@ -226,18 +226,17 @@ tr.prow>td{{padding:6px 14px;font-size:12px;color:#4A4842;border-bottom:1px soli
 tr.prow .pname{{padding-left:30px;font-weight:600}}
 tr.prow .pname::before{{content:'·';color:var(--amber);margin-right:8px}}
 th.help{{cursor:help;text-decoration:underline dotted #C9C2B4;text-underline-offset:3px}}
-.sidenav{{position:fixed;right:18px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;z-index:50}}
-.sidenav a{{position:relative;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;
-justify-content:center;background:rgba(255,255,255,.95);border:1px solid var(--line);
-box-shadow:0 1px 5px rgba(0,0,0,.07);text-decoration:none;transition:border-color .15s}}
-.sidenav a b{{font-size:15px;color:var(--amber);font-weight:800}}
+.sidenav{{position:fixed;right:16px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:9px;z-index:50}}
+.sidenav a{{display:flex;align-items:center;gap:9px;padding:7px 15px 7px 8px;background:rgba(255,255,255,.96);
+border:1px solid var(--line);border-radius:24px;box-shadow:0 1px 5px rgba(0,0,0,.07);
+text-decoration:none;white-space:nowrap;transition:border-color .15s}}
+.sidenav a b{{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;
+background:var(--amber-soft);color:var(--amber);font-size:13px;font-weight:800;flex:none}}
+.sidenav a .lbl{{font-size:12px;font-weight:700;color:#4A4842}}
 .sidenav a:hover{{border-color:var(--amber)}}
-.sidenav a .lbl{{position:absolute;right:50px;white-space:nowrap;background:rgba(255,255,255,.97);
-border:1px solid var(--line);border-radius:16px;padding:5px 12px;font-size:11.5px;font-weight:700;
-color:#4A4842;opacity:0;pointer-events:none;transition:opacity .15s;box-shadow:0 1px 5px rgba(0,0,0,.07)}}
-.sidenav a:hover .lbl{{opacity:1}}
+.sidenav a:hover .lbl{{color:#9a5a08}}
 h2[id]{{scroll-margin-top:20px}}
-@media(max-width:1080px){{.sidenav{{display:none}}}}
+@media(max-width:1300px){{.sidenav{{display:none}}}}
 .rec-h{{font-size:15px;font-weight:800;margin:26px 0 10px;display:flex;align-items:baseline;gap:8px}}
 .rec-h .rtag{{font-size:12px;font-weight:600;color:var(--muted)}}
 .simwrap{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}
