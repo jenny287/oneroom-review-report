@@ -15,9 +15,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_report_db as core   # 분석/렌더 로직 재사용
 
 # ── 설정 ──
-PRESETS = [                      # (파일명, 라벨, days)  days=0 → 전체
-    ("index.html", "최근 90일", 90),   # 기본 페이지
+PRESETS = [                      # (파일명, 라벨, days)  days=0 → 전체  / 버튼 표시 순서 = 짧은 기간부터
     ("p30.html",   "최근 30일", 30),
+    ("index.html", "최근 90일", 90),   # 기본 페이지(링크 첫 화면)
     ("p180.html",  "최근 6개월", 180),
     ("pall.html",  "전체", 0),
 ]
