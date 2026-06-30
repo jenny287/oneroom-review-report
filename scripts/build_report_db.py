@@ -315,16 +315,22 @@ def build(csv_path, out_path):
         if items:
             rec_similar.append(dict(anchor=amap.loc[ac, '상품명'], items=items))
 
-    # (3) 상품군 추천: 강점 키워드별로 그 키워드를 가진 만족도 높은 상품 묶음
+    # (3) 상품군 추천: 강점 키워드별로, 그 키워드를 가진 상품을 다시 카테고리로 묶음
     STRENGTH = ['가성비', '편하다', '시원하다', '귀엽다', '예쁘다', '가볍다', '자동', '튼튼하다']
     rec_groups = []
     for kw in STRENGTH:
-        members = [(code2, amap.loc[code2]) for code2, kset in pool_kw.items() if kw in kset]
+        members = [amap.loc[code2] for code2, kset in pool_kw.items() if kw in kset]
         if len(members) < 3: continue
-        members.sort(key=lambda x: (x[1]['pos_ratio'], x[1]['n_total']), reverse=True)
-        items = [dict(name=rr['상품명'], pos_ratio=float(rr['pos_ratio']), n=int(rr['n_total']))
-                 for _, rr in members[:4]]
-        rec_groups.append(dict(keyword=kw, n_products=len(members), items=items))
+        bycat = {}
+        for rr in members:
+            bycat.setdefault(categorize(rr['상품명']), []).append(rr)
+        cats_list = []
+        for cat, rrs in bycat.items():
+            rrs = sorted(rrs, key=lambda r: (r['pos_ratio'], r['n_total']), reverse=True)
+            items = [dict(name=r['상품명'], pos_ratio=float(r['pos_ratio']), n=int(r['n_total'])) for r in rrs[:5]]
+            cats_list.append(dict(cat=cat, n=len(rrs), items=items))
+        cats_list = sorted(cats_list, key=lambda c: (c['cat'] == '기타', -c['n']))
+        rec_groups.append(dict(keyword=kw, n_products=len(members), cats=cats_list))
     rec_groups = sorted(rec_groups, key=lambda g: g['n_products'], reverse=True)[:5]
 
     data = dict(
