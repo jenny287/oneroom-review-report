@@ -20,6 +20,8 @@ POS_MIN     = 4         # 긍정 기준 별점(이상)
 MIN_N       = 30        # 만족도 순위·적극추진 판정 최소 후기 수
 BENCH_AVG   = 4.75      # 적극추진: 평균 별점 기준 (업계 '북극성')
 BENCH_RATIO = 95.0      # 적극추진: 긍정 비율(%) 기준
+WATCH_AVG   = 4.6       # 추진검토(한 단계 아래): 평균 별점 기준
+WATCH_RATIO = 90.0      # 추진검토: 긍정 비율(%) 기준
 IND_AVG     = 4.5       # 업계 평균 별점(벤치마크)
 N_CARDS     = 10        # ③ 심층분석 카드 상품 수
 
@@ -111,6 +113,7 @@ PRODUCT_NOTES = {
 
 def f2(x): return f"{x:.2f}"
 def is_push(a, r, n): return (a >= BENCH_AVG) and (r >= BENCH_RATIO) and (n >= MIN_N)
+def is_watch(a, r, n): return (not is_push(a, r, n)) and (a >= WATCH_AVG) and (r >= WATCH_RATIO) and (n >= MIN_N)
 
 import html as _html
 def clean(t):
@@ -239,7 +242,9 @@ def build(csv_path, out_path):
     agg['pos_ratio'] = (agg['n_pos'] / agg['n_total'] * 100).round(2)
     agg['avg'] = agg['avg'].round(2)
     agg['push'] = agg.apply(lambda r: is_push(r['avg'], r['pos_ratio'], r['n_total']), axis=1)
+    agg['watch'] = agg.apply(lambda r: is_watch(r['avg'], r['pos_ratio'], r['n_total']), axis=1)
     n_push = int(agg['push'].sum())
+    n_watch = int(agg['watch'].sum())
     top_count = agg.sort_values('n_pos', ascending=False).head(12)
     top_ratio = agg[agg['n_total'] >= MIN_N].sort_values(['pos_ratio','n_total'], ascending=[False, False]).head(14)
 
@@ -262,7 +267,7 @@ def build(csv_path, out_path):
         chips = [(w, c, (w in sig)) for w, c in chips_of(code)]
         note = PRODUCT_NOTES.get(name) or auto_note(name, chips, r)
         products.append(dict(code=code, name=name, cat=cat, n_pos=int(r['n_pos']), n_total=int(r['n_total']),
-            pos_ratio=float(r['pos_ratio']), avg=float(r['avg']), push=bool(r['push']),
+            pos_ratio=float(r['pos_ratio']), avg=float(r['avg']), push=bool(r['push']), watch=bool(r['watch']),
             chips=chips, quotes=quotes(cust, code), note=note,
             downloads=download_rows(cust, code)))
 
@@ -335,16 +340,17 @@ def build(csv_path, out_path):
 
     data = dict(
         summary=dict(N_all=N_all, N_cust=N_cust, N_pos=N_pos, pos_ratio=pos_ratio, n_prod=n_prod, avg=avg, period=period),
-        bench=dict(avg=BENCH_AVG, ratio=BENCH_RATIO, min_n=MIN_N, n_push=n_push, ind_avg=IND_AVG),
+        bench=dict(avg=BENCH_AVG, ratio=BENCH_RATIO, min_n=MIN_N, n_push=n_push, ind_avg=IND_AVG,
+                   watch_avg=WATCH_AVG, watch_ratio=WATCH_RATIO, n_watch=n_watch),
         over=over,
-        top_count=[[x['상품명'], int(x['n_total']), int(x['n_pos']), float(x['pos_ratio']), float(x['avg']), bool(x['push'])] for _, x in top_count.iterrows()],
-        top_ratio=[[x['상품명'], int(x['n_total']), int(x['n_pos']), float(x['pos_ratio']), float(x['avg']), bool(x['push'])] for _, x in top_ratio.iterrows()],
+        top_count=[[x['상품명'], int(x['n_total']), int(x['n_pos']), float(x['pos_ratio']), float(x['avg']), bool(x['push']), bool(x['watch'])] for _, x in top_count.iterrows()],
+        top_ratio=[[x['상품명'], int(x['n_total']), int(x['n_pos']), float(x['pos_ratio']), float(x['avg']), bool(x['push']), bool(x['watch'])] for _, x in top_ratio.iterrows()],
         products=products,
         rec=dict(categories=rec_categories, similar=rec_similar, groups=rec_groups))
 
     os.makedirs(os.path.dirname(out_path) or '.', exist_ok=True)
     open(out_path, 'w').write(HTML_TEMPLATE(data))
-    print(f"생성 완료 → {out_path} | 고객후기 {N_cust:,} · 긍정 {f2(pos_ratio)}% · 적극추진 {n_push}개")
+    print(f"생성 완료 → {out_path} | 고객후기 {N_cust:,} · 긍정 {f2(pos_ratio)}% · 적극추진 {n_push}개 · 추진검토 {n_watch}개")
 
 if __name__ == '__main__':
     csv = sys.argv[1] if len(sys.argv) > 1 else 'data/alpha_review_latest.csv'
