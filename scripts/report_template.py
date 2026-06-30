@@ -175,8 +175,8 @@ border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:28px}
 .bench .src{{font-size:11.5px;color:var(--muted);margin-top:10px}}
 .push{{display:inline-block;background:var(--green);color:#fff;font-size:11px;font-weight:700;
 padding:2px 8px;border-radius:20px;vertical-align:middle;white-space:nowrap;letter-spacing:.02em}}
-.watch{{display:inline-block;background:var(--amber-soft);color:#9a5a08;border:1px solid #ECCB97;
-font-size:11px;font-weight:700;padding:1px 8px;border-radius:20px;vertical-align:middle;white-space:nowrap;letter-spacing:.02em}}
+.watch{{display:inline-block;background:var(--amber);color:#fff;font-size:11px;font-weight:700;
+padding:2px 8px;border-radius:20px;vertical-align:middle;white-space:nowrap;letter-spacing:.02em}}
 .bar{{height:9px;background:var(--chip);border-radius:6px;overflow:hidden}}
 .bar-fill{{height:100%;border-radius:6px}}
 .kwrow{{display:grid;grid-template-columns:96px 1fr 56px;align-items:center;gap:14px;padding:5px 0}}
@@ -186,7 +186,7 @@ font-size:11px;font-weight:700;padding:1px 8px;border-radius:20px;vertical-align
 .rrow{{display:grid;grid-template-columns:26px 1.5fr 1fr 64px 110px;align-items:center;gap:14px;
 padding:11px 8px;border-bottom:1px solid var(--line);border-radius:8px}}
 .rrow.is-push{{background:var(--green-soft)}}
-.rrow.is-watch{{background:var(--amber-soft)}}
+.rrow.is-watch{{background:#FCE6C8}}
 .rnum{{font-weight:800;color:var(--muted);font-size:14px;text-align:center}}
 .rname{{font-weight:600;font-size:14.5px}}
 .rpos{{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}}
@@ -198,11 +198,11 @@ td.num,th.num{{text-align:right;font-variant-numeric:tabular-nums}}
 td.bi{{color:var(--muted);font-weight:700;width:30px}}
 td.pos{{color:var(--green);font-weight:700}}
 tr.is-push td{{background:var(--green-soft)}}
-tr.is-watch td{{background:var(--amber-soft)}}
+tr.is-watch td{{background:#FCE6C8}}
 .cards{{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}}
 .card{{border:1px solid var(--line);border-radius:16px;padding:22px;background:#fff}}
 .card.is-push{{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset}}
-.card.is-watch{{border-color:#ECCB97;box-shadow:0 0 0 1px #ECCB97 inset}}
+.card.is-watch{{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}}
 .card-top{{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px}}
 .cat{{display:inline-block;border:1px solid var(--line);color:var(--muted);font-size:11.5px;
 font-weight:700;padding:2px 9px;border-radius:20px;background:var(--paper)}}
