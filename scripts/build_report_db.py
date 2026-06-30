@@ -320,6 +320,26 @@ def build(csv_path, out_path):
         if items:
             rec_similar.append(dict(anchor=amap.loc[ac, '상품명'], items=items))
 
+    # (2-b) 같은 카테고리 내 유사 상품 추천 — 앵커와 동일 카테고리 안에서 키워드 유사 상위
+    rec_similar_cat = []
+    for ac in anchors:
+        aset = pool_kw.get(ac) or kwset(ac)
+        acat = categorize(amap.loc[ac, '상품명'])
+        sims = []
+        for code2, kset in pool_kw.items():
+            if code2 == ac: continue
+            if categorize(amap.loc[code2, '상품명']) != acat: continue   # 같은 카테고리만
+            inter = len(aset & kset); union = len(aset | kset) or 1
+            sims.append((inter / union, float(amap.loc[code2, 'pos_ratio']), code2, sorted(aset & kset)))
+        sims.sort(reverse=True)
+        items = []
+        for jac, _pr, code2, shared in sims[:3]:
+            rr = amap.loc[code2]
+            items.append(dict(name=rr['상품명'], shared=shared[:4],
+                              pos_ratio=float(rr['pos_ratio']), avg=float(rr['avg']), n=int(rr['n_total'])))
+        if items:
+            rec_similar_cat.append(dict(anchor=amap.loc[ac, '상품명'], cat=acat, items=items))
+
     # (3) 상품군 추천: 강점 키워드별로, 그 키워드를 가진 상품을 다시 카테고리로 묶음
     STRENGTH = ['가성비', '편하다', '시원하다', '귀엽다', '예쁘다', '가볍다', '자동', '튼튼하다']
     rec_groups = []
@@ -346,7 +366,7 @@ def build(csv_path, out_path):
         top_count=[[x['상품명'], int(x['n_total']), int(x['n_pos']), float(x['pos_ratio']), float(x['avg']), bool(x['push']), bool(x['watch'])] for _, x in top_count.iterrows()],
         top_ratio=[[x['상품명'], int(x['n_total']), int(x['n_pos']), float(x['pos_ratio']), float(x['avg']), bool(x['push']), bool(x['watch'])] for _, x in top_ratio.iterrows()],
         products=products,
-        rec=dict(categories=rec_categories, similar=rec_similar, groups=rec_groups))
+        rec=dict(categories=rec_categories, similar=rec_similar, similar_cat=rec_similar_cat, groups=rec_groups))
 
     os.makedirs(os.path.dirname(out_path) or '.', exist_ok=True)
     open(out_path, 'w').write(HTML_TEMPLATE(data))
